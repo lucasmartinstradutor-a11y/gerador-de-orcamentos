@@ -1,0 +1,5 @@
+{
+  "name": "Copy of React Budget Generator",
+  "description": "A visually appealing and functional budget generator application for proofreading services, built with React and Tailwind CSS. It allows users to calculate costs, apply discounts, and generate a printable summary.",
+  "requestFramePermissions": []
+}
