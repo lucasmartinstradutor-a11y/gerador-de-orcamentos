@@ -9,7 +9,7 @@ import { CopyIcon, PrinterIcon, CheckIcon, DownloadIcon, FileTextIcon } from './
 declare global {
   interface Window {
     PizZip: any;
-    docxtemplater: any;
+    Docxtemplater: any;
     saveAs: (blob: Blob | string, filename: string) => void;
   }
 }
@@ -32,12 +32,12 @@ const App: React.FC = () => {
 
     // Effect to check for CDN library readiness
     useEffect(() => {
-        if (window.PizZip && window.docxtemplater && window.saveAs) {
+        if (window.PizZip && window.Docxtemplater && window.saveAs) {
             setLibsReady(true);
             return;
         }
         const interval = setInterval(() => {
-            if (window.PizZip && window.docxtemplater && window.saveAs) {
+            if (window.PizZip && window.Docxtemplater && window.saveAs) {
                 setLibsReady(true);
                 clearInterval(interval);
             }
@@ -132,7 +132,7 @@ Observações: ${observations || "-"}
             const content = await response.arrayBuffer();
 
             const zip = new window.PizZip(content);
-            const doc = new window.docxtemplater(zip, {
+            const doc = new window.Docxtemplater(zip, {
                 paragraphLoop: true,
                 linebreaks: true,
             });
