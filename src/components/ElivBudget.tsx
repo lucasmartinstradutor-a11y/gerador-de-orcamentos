@@ -1,8 +1,8 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { InputGroup } from './InputGroup';
-import { SelectGroup } from './SelectGroup';
-import { SliderGroup } from './SliderGroup';
-import { ToggleSwitch } from './ToggleSwitch';
+import { InputGroup } from './common/InputGroup';
+import { SelectGroup } from './common/SelectGroup';
+import { SliderGroup } from './common/SliderGroup';
+import { ToggleSwitch } from './common/ToggleSwitch';
 
 // Declare global variables from CDN scripts for TypeScript
 declare global {
