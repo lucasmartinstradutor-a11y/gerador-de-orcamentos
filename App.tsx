@@ -10,7 +10,7 @@ import { CopyIcon, PrinterIcon, CheckIcon, DownloadIcon, FileTextIcon } from './
 declare global {
   interface Window {
     PizZip: any;
-    docxtemplater: any;
+    Docxtemplater: any; // Corrected: D is capitalized
     saveAs: (blob: Blob | string, filename: string) => void;
   }
 }
@@ -31,16 +31,17 @@ const App: React.FC = () => {
     const [templateFile, setTemplateFile] = useState<File | null>(null);
     const [libsReady, setLibsReady] = useState(false);
 
-     // Effect to check for CDN library readiness
+    // Effect to check for CDN library readiness
     useEffect(() => {
-        // Check immediately in case they are already loaded from cache
-        if (window.PizZip && window.docxtemplater && window.saveAs) {
+        // Check if libs are already loaded (e.g., from cache)
+        if (window.PizZip && window.Docxtemplater && window.saveAs) {
             setLibsReady(true);
-            return;
+            return; // Exit if already loaded
         }
 
         const interval = setInterval(() => {
-            if (window.PizZip && window.docxtemplater && window.saveAs) {
+            // Keep checking until all libraries are available
+            if (window.PizZip && window.Docxtemplater && window.saveAs) {
                 setLibsReady(true);
                 clearInterval(interval);
             }
@@ -49,17 +50,14 @@ const App: React.FC = () => {
         // Stop checking after 10 seconds to avoid infinite loops if CDN fails
         const timeout = setTimeout(() => {
             clearInterval(interval);
-            if (!libsReady) {
-                console.warn("Could not load DOCX generation libraries after 10 seconds.");
-            }
         }, 10000);
 
-        // Cleanup function
+        // Cleanup function to clear interval and timeout if component unmounts
         return () => {
             clearInterval(interval);
             clearTimeout(timeout);
         };
-    }, [libsReady]); // Rerun if libsReady changes, though it should only run once effectively
+    }, []); // Empty dependency array ensures this runs only once on component mount
 
     const brMoney = useCallback((value: number): string => {
         return new Intl.NumberFormat('pt-BR', {
@@ -169,7 +167,7 @@ Observações: ${observations || "-"}
                 if (!content) throw new Error("Falha ao ler o arquivo.");
                 
                 const zip = new window.PizZip(content);
-                const doc = new window.docxtemplater(zip, {
+                const doc = new window.Docxtemplater(zip, { // Corrected: D is capitalized
                     paragraphLoop: true,
                     linebreaks: true,
                 });
