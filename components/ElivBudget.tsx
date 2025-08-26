@@ -81,7 +81,7 @@ export const ElivBudget: React.FC = () => {
         try {
             const response = await fetch(templatePath);
             if (!response.ok) {
-                throw new Error(`Não foi possível encontrar o template: ${templatePath}. Certifique-se que o arquivo existe na pasta /public/templates.`);
+                throw new Error(`Template não encontrado em '${templatePath}'. Por favor, crie uma pasta 'public' na raiz do seu projeto, dentro dela crie outra pasta chamada 'templates', e coloque seus arquivos .docx ('ELIV_Comum.docx', 'ELIV_Universidade.docx') lá.`);
             }
             const content = await response.arrayBuffer();
             
