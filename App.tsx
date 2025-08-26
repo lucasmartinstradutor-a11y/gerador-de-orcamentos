@@ -6,11 +6,10 @@ import { PrintableBudget } from './components/PrintableBudget';
 import { CopyIcon, PrinterIcon, CheckIcon, DownloadIcon, FileTextIcon } from './components/Icons';
 
 // Declare global variables from CDN scripts for TypeScript
-// This makes them available on the `window` object for robust access
 declare global {
   interface Window {
     PizZip: any;
-    docxtemplater: any; // Corrected: d is lowercase
+    docxtemplater: any;
     saveAs: (blob: Blob | string, filename: string) => void;
   }
 }
@@ -29,42 +28,29 @@ const App: React.FC = () => {
     const [deliveryDays, setDeliveryDays] = useState<number>(30);
 
     const [isCopied, setIsCopied] = useState(false);
-    const [templateFile, setTemplateFile] = useState<File | null>(null);
     const [libsReady, setLibsReady] = useState(false);
 
     // Effect to check for CDN library readiness
     useEffect(() => {
-        // Check if libs are already loaded (e.g., from cache)
         if (window.PizZip && window.docxtemplater && window.saveAs) {
             setLibsReady(true);
-            return; // Exit if already loaded
+            return;
         }
-
         const interval = setInterval(() => {
-            // Keep checking until all libraries are available
             if (window.PizZip && window.docxtemplater && window.saveAs) {
                 setLibsReady(true);
                 clearInterval(interval);
             }
-        }, 100); // Check every 100ms
-
-        // Stop checking after 10 seconds to avoid infinite loops if CDN fails
-        const timeout = setTimeout(() => {
-            clearInterval(interval);
-        }, 10000);
-
-        // Cleanup function to clear interval and timeout if component unmounts
+        }, 100);
+        const timeout = setTimeout(() => clearInterval(interval), 10000);
         return () => {
             clearInterval(interval);
             clearTimeout(timeout);
         };
-    }, []); // Empty dependency array ensures this runs only once on component mount
+    }, []);
 
     const brMoney = useCallback((value: number): string => {
-        return new Intl.NumberFormat('pt-BR', {
-            style: 'currency',
-            currency: 'BRL',
-        }).format(value);
+        return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
     }, []);
 
     const brInt = useCallback((value: number): string => {
@@ -77,21 +63,11 @@ const App: React.FC = () => {
         const discountValue = basePrice * discountRate;
         const finalPrice = basePrice - discountValue;
         const installmentValue = finalPrice > 0 ? finalPrice / installments : 0;
-
         const today = new Date();
         const deliveryDate = new Date();
         deliveryDate.setDate(today.getDate() + deliveryDays);
-
         const formatDate = (date: Date) => date.toLocaleDateString('pt-BR');
-
-        return {
-            basePrice,
-            discountValue,
-            finalPrice,
-            installmentValue,
-            budgetDate: formatDate(today),
-            deliveryDate: formatDate(deliveryDate),
-        };
+        return { basePrice, discountValue, finalPrice, installmentValue, budgetDate: formatDate(today), deliveryDate: formatDate(deliveryDate) };
     }, [wordCount, pricePerWord, applyDiscount, discountPercentage, installments, deliveryDays]);
     
     const formattedValues = useMemo(() => {
@@ -142,83 +118,63 @@ Observações: ${observations || "-"}
         window.saveAs(blob, `Orcamento_Script_${timestamp}.txt`);
     };
 
-    const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-        if (event.target.files && event.target.files.length > 0) {
-            setTemplateFile(event.target.files[0]);
-        } else {
-            setTemplateFile(null);
-        }
-    };
-
-    const handleGenerateDocx = () => {
-        if (!templateFile) {
-            alert("Por favor, carregue um arquivo de modelo .docx primeiro.");
-            return;
-        }
-
+    const handleGenerateDocx = async () => {
         if (!libsReady) {
-            alert("Erro: As bibliotecas de geração de DOCX não estão prontas. Por favor, aguarde um momento e tente novamente.");
+            alert("As bibliotecas de geração de documentos ainda estão carregando. Por favor, aguarde um momento.");
             return;
         }
 
-        const reader = new FileReader();
-        reader.onload = (event) => {
-            try {
-                const content = event.target?.result;
-                if (!content) throw new Error("Falha ao ler o arquivo.");
-                
-                const zip = new window.PizZip(content);
-                const doc = new window.docxtemplater(zip, { // Corrected: d is lowercase
-                    paragraphLoop: true,
-                    linebreaks: true,
-                });
-
-                const context = {
-                    nome_cliente: clientName,
-                    consultor: consultant,
-                    observacoes: observations,
-                    palavras: formattedValues.wordCount,
-                    valor_palavra: brMoney(pricePerWord),
-                    preco_base: formattedValues.basePrice,
-                    desconto_percent: formattedValues.discountDisplay,
-                    valor_desconto: formattedValues.discountValue,
-                    preco_final: formattedValues.finalPrice,
-                    num_parcelas: installments,
-                    valor_parcela: formattedValues.installmentValue,
-                    parcelamento_texto: formattedValues.installmentText,
-                    prazo_dias: deliveryDays,
-                    data_orcamento: calculations.budgetDate,
-                    data_entrega: calculations.deliveryDate,
-                };
-
-                doc.render(context);
-
-                const out = doc.getZip().generate({
-                    type: "blob",
-                    mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                });
-                
-                const now = new Date();
-                const timestamp = `${now.getFullYear()}${(now.getMonth() + 1).toString().padStart(2, '0')}${now.getDate().toString().padStart(2, '0')}_${now.getHours().toString().padStart(2, '0')}${now.getMinutes().toString().padStart(2, '0')}`;
-                
-                window.saveAs(out, `Orcamento_Rev_${timestamp}.docx`);
-
-            } catch (error: any) {
-                console.error("Erro ao gerar DOCX:", error);
-                if (error.properties && error.properties.id === 'template_error') {
-                    alert(`Ocorreu um erro no modelo: ${error.message}\n\nVerifique se todos os placeholders (ex: {nome_cliente}) estão corretos no seu arquivo .docx.`);
-                } else {
-                    alert(`Ocorreu um erro ao processar o arquivo: ${error.message}`);
-                }
+        try {
+            const response = await fetch('/modelo_dialetica.docx');
+            if (!response.ok) {
+                throw new Error('Não foi possível carregar o arquivo de modelo. Verifique se "modelo_dialetica.docx" está na pasta "public" do seu projeto.');
             }
-        };
-        reader.onerror = (error) => {
-             console.error("Erro ao ler o arquivo:", error);
-             alert("Não foi possível ler o arquivo selecionado.");
-        };
-        reader.readAsArrayBuffer(templateFile);
-    };
+            const content = await response.arrayBuffer();
 
+            const zip = new window.PizZip(content);
+            const doc = new window.docxtemplater(zip, {
+                paragraphLoop: true,
+                linebreaks: true,
+            });
+
+            const context = {
+                nome_cliente: clientName,
+                consultor: consultant,
+                observacoes: observations,
+                palavras: formattedValues.wordCount,
+                valor_palavra: brMoney(pricePerWord),
+                preco_base: formattedValues.basePrice,
+                desconto_percent: formattedValues.discountDisplay,
+                valor_desconto: formattedValues.discountValue,
+                preco_final: formattedValues.finalPrice,
+                num_parcelas: installments,
+                valor_parcela: formattedValues.installmentValue,
+                parcelamento_texto: formattedValues.installmentText,
+                prazo_dias: deliveryDays,
+                data_orcamento: calculations.budgetDate,
+                data_entrega: calculations.deliveryDate,
+            };
+
+            doc.render(context);
+
+            const out = doc.getZip().generate({
+                type: "blob",
+                mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            });
+
+            const now = new Date();
+            const timestamp = `${now.getFullYear()}${(now.getMonth() + 1).toString().padStart(2, '0')}${now.getDate().toString().padStart(2, '0')}_${now.getHours().toString().padStart(2, '0')}${now.getMinutes().toString().padStart(2, '0')}`;
+            window.saveAs(out, `Orcamento_Rev_${timestamp}.docx`);
+
+        } catch (error: any) {
+            console.error("Erro ao gerar DOCX:", error);
+            if (error.properties && error.properties.id === 'template_error') {
+                alert(`Ocorreu um erro no modelo: ${error.message}\n\nVerifique se todos os placeholders (ex: {nome_cliente}) estão corretos no seu arquivo .docx.`);
+            } else {
+                alert(`Ocorreu um erro ao processar o arquivo: ${error.message}`);
+            }
+        }
+    };
 
     return (
         <>
@@ -286,25 +242,19 @@ Observações: ${observations || "-"}
                             </div>
 
                              <div className="bg-white p-6 rounded-2xl shadow-lg border border-slate-200">
-                                <div className="flex justify-between items-center mb-4">
-                                    <h2 className="text-2xl font-bold text-slate-800">Gerar Documentos</h2>
-                                </div>
-                                <div className="space-y-4">
-                                    <div>
-                                        <label htmlFor="template-upload" className="block text-sm font-medium text-slate-700 mb-1">1. Carregar modelo .docx</label>
-                                        <input id="template-upload" type="file" accept=".docx" onChange={handleFileChange} className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"/>
-                                        <p className="text-xs text-slate-500 mt-1">Use placeholders como `&#123;nome_cliente&#125;`. <span className="font-semibold">Dica:</span> Insira a logo da sua editora diretamente no arquivo de modelo.</p>
-                                    </div>
-                                    <div className="flex space-x-3 pt-2">
-                                        <button onClick={handleGenerateDocx} disabled={!templateFile || !libsReady} className="flex items-center justify-center w-36 px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all duration-200 disabled:bg-slate-400 disabled:cursor-not-allowed">
-                                            <DownloadIcon className="w-5 h-5 mr-2" />
-                                            {libsReady ? 'Gerar DOCX' : 'Carregando...'}
-                                        </button>
-                                        <button onClick={handlePrint} className="flex items-center justify-center w-36 px-4 py-2 text-sm font-medium text-indigo-700 bg-indigo-100 rounded-lg hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all duration-200">
-                                            <PrinterIcon className="w-5 h-5 mr-2" />
-                                            Gerar PDF
-                                        </button>
-                                    </div>
+                                <h2 className="text-2xl font-bold text-slate-800 mb-4">Gerar Documentos</h2>
+                                <p className="text-sm text-slate-600 mb-4">
+                                    Clique para baixar os documentos. O arquivo DOCX usará o modelo padrão da Dialética Revisões, já com os dados preenchidos.
+                                </p>
+                                <div className="flex space-x-3 pt-2">
+                                    <button onClick={handleGenerateDocx} disabled={!libsReady} className="flex items-center justify-center w-36 px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all duration-200 disabled:bg-slate-400 disabled:cursor-not-allowed">
+                                        <DownloadIcon className="w-5 h-5 mr-2" />
+                                        {libsReady ? 'Gerar DOCX' : 'Carregando...'}
+                                    </button>
+                                    <button onClick={handlePrint} className="flex items-center justify-center w-36 px-4 py-2 text-sm font-medium text-indigo-700 bg-indigo-100 rounded-lg hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all duration-200">
+                                        <PrinterIcon className="w-5 h-5 mr-2" />
+                                        Gerar PDF
+                                    </button>
                                 </div>
                             </div>
                             
