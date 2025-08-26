@@ -3,12 +3,18 @@ import { InputGroup } from './components/InputGroup';
 import { MetricCard } from './components/MetricCard';
 import { ToggleSwitch } from './components/ToggleSwitch';
 import { PrintableBudget } from './components/PrintableBudget';
-import { CopyIcon, PrinterIcon, CheckIcon, DownloadIcon } from './components/Icons';
+import { CopyIcon, PrinterIcon, CheckIcon, DownloadIcon, FileTextIcon } from './components/Icons';
 
 // Declare global variables from CDN scripts for TypeScript
-declare var PizZip: any;
-declare var docxtemplater: any;
-declare var saveAs: any;
+// This makes them available on the `window` object for robust access
+declare global {
+  interface Window {
+    PizZip: any;
+    docxtemplater: any;
+    saveAs: (blob: Blob | string, filename: string) => void;
+  }
+}
+
 
 const App: React.FC = () => {
     const [clientName, setClientName] = useState('Prof. João Silva');
@@ -99,6 +105,13 @@ Observações: ${observations || "-"}
         window.print();
     };
 
+    const handleDownloadTxt = () => {
+        const blob = new Blob([salesScript], { type: "text/plain;charset=utf-8" });
+        const now = new Date();
+        const timestamp = `${now.getFullYear()}${(now.getMonth() + 1).toString().padStart(2, '0')}${now.getDate().toString().padStart(2, '0')}_${now.getHours().toString().padStart(2, '0')}${now.getMinutes().toString().padStart(2, '0')}`;
+        window.saveAs(blob, `Orcamento_Script_${timestamp}.txt`);
+    };
+
     const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
         if (event.target.files && event.target.files.length > 0) {
             setTemplateFile(event.target.files[0]);
@@ -113,14 +126,22 @@ Observações: ${observations || "-"}
             return;
         }
 
+        // Check if the required libraries are loaded from the CDN
+        if (typeof window.PizZip === 'undefined' || typeof window.docxtemplater === 'undefined' || typeof window.saveAs === 'undefined') {
+            alert("Erro: As bibliotecas necessárias para gerar o DOCX não foram carregadas. Verifique sua conexão com a internet e tente recarregar a página.");
+            console.error("PizZip, docxtemplater, or saveAs is not defined on the window object.");
+            return;
+        }
+
         const reader = new FileReader();
         reader.onload = (event) => {
             try {
                 const content = event.target?.result;
                 if (!content) throw new Error("Falha ao ler o arquivo.");
                 
-                const zip = new PizZip(content);
-                const doc = new docxtemplater(zip, {
+                // Use window.PizZip and window.docxtemplater to avoid ReferenceError
+                const zip = new window.PizZip(content);
+                const doc = new window.docxtemplater(zip, {
                     paragraphLoop: true,
                     linebreaks: true,
                 });
@@ -152,11 +173,18 @@ Observações: ${observations || "-"}
                 
                 const now = new Date();
                 const timestamp = `${now.getFullYear()}${(now.getMonth() + 1).toString().padStart(2, '0')}${now.getDate().toString().padStart(2, '0')}_${now.getHours().toString().padStart(2, '0')}${now.getMinutes().toString().padStart(2, '0')}`;
-                saveAs(out, `Orcamento_Rev_${timestamp}.docx`);
+                
+                // Use window.saveAs for robustness
+                window.saveAs(out, `Orcamento_Rev_${timestamp}.docx`);
 
             } catch (error: any) {
                 console.error("Erro ao gerar DOCX:", error);
-                alert(`Ocorreu um erro: ${error.message}`);
+                 // Check for a specific error from docxtemplater about missing tags
+                if (error.properties && error.properties.id === 'template_error') {
+                    alert(`Ocorreu um erro no modelo: ${error.message}\n\nVerifique se todos os placeholders (ex: {nome_cliente}) estão corretos no seu arquivo .docx.`);
+                } else {
+                    alert(`Ocorreu um erro ao processar o arquivo: ${error.message}`);
+                }
             }
         };
         reader.onerror = (error) => {
@@ -239,7 +267,7 @@ Observações: ${observations || "-"}
                                     <div>
                                         <label htmlFor="template-upload" className="block text-sm font-medium text-slate-700 mb-1">1. Carregar modelo .docx</label>
                                         <input id="template-upload" type="file" accept=".docx" onChange={handleFileChange} className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"/>
-                                        <p className="text-xs text-slate-500 mt-1">Use placeholders como `&#123;nome_cliente&#125;` e `&#123;preco_final&#125;` no seu arquivo.</p>
+                                        <p className="text-xs text-slate-500 mt-1">Use placeholders como `&#123;nome_cliente&#125;`. <span className="font-semibold">Dica:</span> Insira a logo da sua editora diretamente no arquivo de modelo.</p>
                                     </div>
                                     <div className="flex space-x-3 pt-2">
                                         <button onClick={handleGenerateDocx} disabled={!templateFile} className="flex items-center justify-center w-36 px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all duration-200 disabled:bg-slate-400 disabled:cursor-not-allowed">
@@ -257,21 +285,27 @@ Observações: ${observations || "-"}
                             <div className="bg-white p-6 rounded-2xl shadow-lg border border-slate-200">
                                 <div className="flex justify-between items-center mb-4">
                                     <h2 className="text-2xl font-bold text-slate-800">Script para Envio Rápido</h2>
-                                    <button onClick={handleCopyToClipboard} className="flex items-center justify-center w-32 px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all duration-200">
-                                        {isCopied ? (
-                                            <>
-                                                <CheckIcon className="w-5 h-5 mr-2" />
-                                                Copiado!
-                                            </>
-                                        ) : (
-                                            <>
-                                                <CopyIcon className="w-5 h-5 mr-2" />
-                                                Copiar
-                                            </>
-                                        )}
-                                    </button>
+                                    <div className="flex items-center space-x-3">
+                                        <button onClick={handleCopyToClipboard} className="flex items-center justify-center w-32 px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all duration-200">
+                                            {isCopied ? (
+                                                <>
+                                                    <CheckIcon className="w-5 h-5 mr-2" />
+                                                    Copiado!
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <CopyIcon className="w-5 h-5 mr-2" />
+                                                    Copiar
+                                                </>
+                                            )}
+                                        </button>
+                                         <button onClick={handleDownloadTxt} className="flex items-center justify-center w-36 px-4 py-2 text-sm font-medium text-indigo-700 bg-indigo-100 rounded-lg hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all duration-200">
+                                            <FileTextIcon className="w-5 h-5 mr-2" />
+                                            Baixar (.txt)
+                                        </button>
+                                    </div>
                                 </div>
-                                <textarea readOnly value={salesScript} rows={12} className="w-full p-4 font-mono text-sm bg-slate-100 text-slate-800 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
+                                <textarea readOnly value={salesScript} rows={10} className="w-full p-4 font-mono text-sm bg-slate-100 text-slate-800 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
                             </div>
                         </div>
                     </main>
