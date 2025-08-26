@@ -1,10 +1,14 @@
-
 import React, { useState, useMemo, useCallback } from 'react';
 import { InputGroup } from './components/InputGroup';
 import { MetricCard } from './components/MetricCard';
 import { ToggleSwitch } from './components/ToggleSwitch';
 import { PrintableBudget } from './components/PrintableBudget';
-import { CopyIcon, PrinterIcon, CheckIcon } from './components/Icons';
+import { CopyIcon, PrinterIcon, CheckIcon, DownloadIcon } from './components/Icons';
+
+// Declare global variables from CDN scripts for TypeScript
+declare var PizZip: any;
+declare var docxtemplater: any;
+declare var saveAs: any;
 
 const App: React.FC = () => {
     const [clientName, setClientName] = useState('Prof. João Silva');
@@ -18,6 +22,7 @@ const App: React.FC = () => {
     const [deliveryDays, setDeliveryDays] = useState<number>(30);
 
     const [isCopied, setIsCopied] = useState(false);
+    const [templateFile, setTemplateFile] = useState<File | null>(null);
 
     const brMoney = useCallback((value: number): string => {
         return new Intl.NumberFormat('pt-BR', {
@@ -94,6 +99,74 @@ Observações: ${observations || "-"}
         window.print();
     };
 
+    const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        if (event.target.files && event.target.files.length > 0) {
+            setTemplateFile(event.target.files[0]);
+        } else {
+            setTemplateFile(null);
+        }
+    };
+
+    const handleGenerateDocx = () => {
+        if (!templateFile) {
+            alert("Por favor, carregue um arquivo de modelo .docx primeiro.");
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            try {
+                const content = event.target?.result;
+                if (!content) throw new Error("Falha ao ler o arquivo.");
+                
+                const zip = new PizZip(content);
+                const doc = new docxtemplater(zip, {
+                    paragraphLoop: true,
+                    linebreaks: true,
+                });
+
+                const context = {
+                    nome_cliente: clientName,
+                    consultor: consultant,
+                    observacoes: observations,
+                    palavras: formattedValues.wordCount,
+                    valor_palavra: brMoney(pricePerWord),
+                    preco_base: formattedValues.basePrice,
+                    desconto_percent: formattedValues.discountDisplay,
+                    valor_desconto: formattedValues.discountValue,
+                    preco_final: formattedValues.finalPrice,
+                    num_parcelas: installments,
+                    valor_parcela: formattedValues.installmentValue,
+                    parcelamento_texto: formattedValues.installmentText,
+                    prazo_dias: deliveryDays,
+                    data_orcamento: calculations.budgetDate,
+                    data_entrega: calculations.deliveryDate,
+                };
+
+                doc.render(context);
+
+                const out = doc.getZip().generate({
+                    type: "blob",
+                    mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                });
+                
+                const now = new Date();
+                const timestamp = `${now.getFullYear()}${(now.getMonth() + 1).toString().padStart(2, '0')}${now.getDate().toString().padStart(2, '0')}_${now.getHours().toString().padStart(2, '0')}${now.getMinutes().toString().padStart(2, '0')}`;
+                saveAs(out, `Orcamento_Rev_${timestamp}.docx`);
+
+            } catch (error: any) {
+                console.error("Erro ao gerar DOCX:", error);
+                alert(`Ocorreu um erro: ${error.message}`);
+            }
+        };
+        reader.onerror = (error) => {
+             console.error("Erro ao ler o arquivo:", error);
+             alert("Não foi possível ler o arquivo selecionado.");
+        };
+        reader.readAsArrayBuffer(templateFile);
+    };
+
+
     return (
         <>
             <div className="min-h-screen bg-slate-50 text-slate-800 p-4 sm:p-6 lg:p-8 print:hidden">
@@ -157,29 +230,46 @@ Observações: ${observations || "-"}
                                     <p><strong>Prazo estimado:</strong> {deliveryDays} dias (entrega até {calculations.deliveryDate})</p>
                                 </div>
                             </div>
+
+                             <div className="bg-white p-6 rounded-2xl shadow-lg border border-slate-200">
+                                <div className="flex justify-between items-center mb-4">
+                                    <h2 className="text-2xl font-bold text-slate-800">Gerar Documentos</h2>
+                                </div>
+                                <div className="space-y-4">
+                                    <div>
+                                        <label htmlFor="template-upload" className="block text-sm font-medium text-slate-700 mb-1">1. Carregar modelo .docx</label>
+                                        <input id="template-upload" type="file" accept=".docx" onChange={handleFileChange} className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"/>
+                                        <p className="text-xs text-slate-500 mt-1">Use placeholders como `&#123;nome_cliente&#125;` e `&#123;preco_final&#125;` no seu arquivo.</p>
+                                    </div>
+                                    <div className="flex space-x-3 pt-2">
+                                        <button onClick={handleGenerateDocx} disabled={!templateFile} className="flex items-center justify-center w-36 px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all duration-200 disabled:bg-slate-400 disabled:cursor-not-allowed">
+                                            <DownloadIcon className="w-5 h-5 mr-2" />
+                                            Gerar DOCX
+                                        </button>
+                                        <button onClick={handlePrint} className="flex items-center justify-center w-36 px-4 py-2 text-sm font-medium text-indigo-700 bg-indigo-100 rounded-lg hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all duration-200">
+                                            <PrinterIcon className="w-5 h-5 mr-2" />
+                                            Gerar PDF
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
                             
                             <div className="bg-white p-6 rounded-2xl shadow-lg border border-slate-200">
                                 <div className="flex justify-between items-center mb-4">
-                                    <h2 className="text-2xl font-bold text-slate-800">Script para Envio</h2>
-                                    <div className="flex space-x-3">
-                                        <button onClick={handleCopyToClipboard} className="flex items-center justify-center w-32 px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all duration-200">
-                                            {isCopied ? (
-                                                <>
-                                                    <CheckIcon className="w-5 h-5 mr-2" />
-                                                    Copiado!
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <CopyIcon className="w-5 h-5 mr-2" />
-                                                    Copiar
-                                                </>
-                                            )}
-                                        </button>
-                                        <button onClick={handlePrint} className="flex items-center px-4 py-2 text-sm font-medium text-indigo-700 bg-indigo-100 rounded-lg hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all duration-200">
-                                            <PrinterIcon className="w-5 h-5 mr-2" />
-                                            Imprimir
-                                        </button>
-                                    </div>
+                                    <h2 className="text-2xl font-bold text-slate-800">Script para Envio Rápido</h2>
+                                    <button onClick={handleCopyToClipboard} className="flex items-center justify-center w-32 px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all duration-200">
+                                        {isCopied ? (
+                                            <>
+                                                <CheckIcon className="w-5 h-5 mr-2" />
+                                                Copiado!
+                                            </>
+                                        ) : (
+                                            <>
+                                                <CopyIcon className="w-5 h-5 mr-2" />
+                                                Copiar
+                                            </>
+                                        )}
+                                    </button>
                                 </div>
                                 <textarea readOnly value={salesScript} rows={12} className="w-full p-4 font-mono text-sm bg-slate-100 text-slate-800 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
                             </div>
