@@ -22,6 +22,7 @@ interface FormattedValues {
 interface PrintableBudgetProps {
     clientName: string;
     consultant: string;
+    consultantPhone: string;
     observations: string;
     deliveryDays: number;
     calculations: CalculationDetails;
@@ -31,6 +32,7 @@ interface PrintableBudgetProps {
 export const PrintableBudget: React.FC<PrintableBudgetProps> = ({
     clientName,
     consultant,
+    consultantPhone,
     observations,
     deliveryDays,
     calculations,
@@ -57,6 +59,7 @@ export const PrintableBudget: React.FC<PrintableBudgetProps> = ({
                 <div>
                     <h2 className="text-lg font-semibold text-gray-500 uppercase tracking-wider mb-2">DE</h2>
                     <p className="text-xl font-medium text-gray-800">{consultant || 'Consultor não informado'}</p>
+                    <p className="text-gray-600">{consultantPhone || 'Telefone não informado'}</p>
                     <p className="text-gray-600">Dialética Revisões</p>
                 </div>
             </section>
@@ -108,8 +111,7 @@ export const PrintableBudget: React.FC<PrintableBudgetProps> = ({
             )}
 
             <footer className="mt-16 pt-6 border-t-2 border-gray-300 text-center text-gray-500">
-                <p>Obrigado pela sua confiança!</p>
-                <p>Dialética Revisões - (XX) XXXX-XXXX - contato@dialetica.com</p>
+                <p>Obrigado Pela Confiança - Revisões Dialética</p>
             </footer>
         </div>
     );

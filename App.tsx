@@ -10,7 +10,7 @@ import { CopyIcon, PrinterIcon, CheckIcon, DownloadIcon, FileTextIcon } from './
 declare global {
   interface Window {
     PizZip: any;
-    Docxtemplater: any; // Corrected: D is capitalized
+    docxtemplater: any; // Corrected: d is lowercase
     saveAs: (blob: Blob | string, filename: string) => void;
   }
 }
@@ -19,6 +19,7 @@ declare global {
 const App: React.FC = () => {
     const [clientName, setClientName] = useState('Prof. João Silva');
     const [consultant, setConsultant] = useState('Lucas Martins');
+    const [consultantPhone, setConsultantPhone] = useState('(XX) XXXXX-XXXX');
     const [observations, setObservations] = useState('Valores válidos por 7 dias. Entrega estimada conforme cronograma.');
     const [wordCount, setWordCount] = useState<number>(30000);
     const [pricePerWord, setPricePerWord] = useState<number>(0.03);
@@ -34,14 +35,14 @@ const App: React.FC = () => {
     // Effect to check for CDN library readiness
     useEffect(() => {
         // Check if libs are already loaded (e.g., from cache)
-        if (window.PizZip && window.Docxtemplater && window.saveAs) {
+        if (window.PizZip && window.docxtemplater && window.saveAs) {
             setLibsReady(true);
             return; // Exit if already loaded
         }
 
         const interval = setInterval(() => {
             // Keep checking until all libraries are available
-            if (window.PizZip && window.Docxtemplater && window.saveAs) {
+            if (window.PizZip && window.docxtemplater && window.saveAs) {
                 setLibsReady(true);
                 clearInterval(interval);
             }
@@ -167,7 +168,7 @@ Observações: ${observations || "-"}
                 if (!content) throw new Error("Falha ao ler o arquivo.");
                 
                 const zip = new window.PizZip(content);
-                const doc = new window.Docxtemplater(zip, { // Corrected: D is capitalized
+                const doc = new window.docxtemplater(zip, { // Corrected: d is lowercase
                     paragraphLoop: true,
                     linebreaks: true,
                 });
@@ -237,6 +238,7 @@ Observações: ${observations || "-"}
                                     <div className="space-y-4">
                                         <InputGroup label="Nome do cliente" id="clientName" value={clientName} onChange={(e) => setClientName(e.target.value)} placeholder="Ex.: Prof. João Silva" />
                                         <InputGroup label="Consultor" id="consultant" value={consultant} onChange={(e) => setConsultant(e.target.value)} placeholder="Ex.: Lucas Martins" />
+                                        <InputGroup label="Telefone do Consultor" id="consultantPhone" value={consultantPhone} onChange={(e) => setConsultantPhone(e.target.value)} placeholder="(XX) XXXXX-XXXX" />
                                         <div className="flex flex-col">
                                             <label htmlFor="observations" className="mb-1.5 font-medium text-slate-700">Observações (opcional)</label>
                                             <textarea id="observations" value={observations} onChange={(e) => setObservations(e.target.value)} rows={3} className="w-full px-4 py-2 text-slate-700 bg-slate-100 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 transition duration-200" placeholder="Ex.: Valores válidos por 7 dias."></textarea>
@@ -339,6 +341,7 @@ Observações: ${observations || "-"}
                  <PrintableBudget
                     clientName={clientName}
                     consultant={consultant}
+                    consultantPhone={consultantPhone}
                     observations={observations}
                     deliveryDays={deliveryDays}
                     calculations={calculations}
