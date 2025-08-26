@@ -11,6 +11,17 @@
       body {
         font-family: 'Inter', sans-serif;
       }
+      /* Print-specific styles */
+      @media print {
+        @page {
+          size: A4;
+          /* Remove browser-injected headers and footers */
+          margin: 0;
+        }
+        body, html {
+          background: #fff;
+        }
+      }
     </style>
   <script type="importmap">
 {

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { InputGroup } from './components/InputGroup';
 import { MetricCard } from './components/MetricCard';
 import { ToggleSwitch } from './components/ToggleSwitch';
@@ -29,6 +29,37 @@ const App: React.FC = () => {
 
     const [isCopied, setIsCopied] = useState(false);
     const [templateFile, setTemplateFile] = useState<File | null>(null);
+    const [libsReady, setLibsReady] = useState(false);
+
+     // Effect to check for CDN library readiness
+    useEffect(() => {
+        // Check immediately in case they are already loaded from cache
+        if (window.PizZip && window.docxtemplater && window.saveAs) {
+            setLibsReady(true);
+            return;
+        }
+
+        const interval = setInterval(() => {
+            if (window.PizZip && window.docxtemplater && window.saveAs) {
+                setLibsReady(true);
+                clearInterval(interval);
+            }
+        }, 100); // Check every 100ms
+
+        // Stop checking after 10 seconds to avoid infinite loops if CDN fails
+        const timeout = setTimeout(() => {
+            clearInterval(interval);
+            if (!libsReady) {
+                console.warn("Could not load DOCX generation libraries after 10 seconds.");
+            }
+        }, 10000);
+
+        // Cleanup function
+        return () => {
+            clearInterval(interval);
+            clearTimeout(timeout);
+        };
+    }, [libsReady]); // Rerun if libsReady changes, though it should only run once effectively
 
     const brMoney = useCallback((value: number): string => {
         return new Intl.NumberFormat('pt-BR', {
@@ -126,10 +157,8 @@ Observações: ${observations || "-"}
             return;
         }
 
-        // Check if the required libraries are loaded from the CDN
-        if (typeof window.PizZip === 'undefined' || typeof window.docxtemplater === 'undefined' || typeof window.saveAs === 'undefined') {
-            alert("Erro: As bibliotecas necessárias para gerar o DOCX não foram carregadas. Verifique sua conexão com a internet e tente recarregar a página.");
-            console.error("PizZip, docxtemplater, or saveAs is not defined on the window object.");
+        if (!libsReady) {
+            alert("Erro: As bibliotecas de geração de DOCX não estão prontas. Por favor, aguarde um momento e tente novamente.");
             return;
         }
 
@@ -139,7 +168,6 @@ Observações: ${observations || "-"}
                 const content = event.target?.result;
                 if (!content) throw new Error("Falha ao ler o arquivo.");
                 
-                // Use window.PizZip and window.docxtemplater to avoid ReferenceError
                 const zip = new window.PizZip(content);
                 const doc = new window.docxtemplater(zip, {
                     paragraphLoop: true,
@@ -174,12 +202,10 @@ Observações: ${observations || "-"}
                 const now = new Date();
                 const timestamp = `${now.getFullYear()}${(now.getMonth() + 1).toString().padStart(2, '0')}${now.getDate().toString().padStart(2, '0')}_${now.getHours().toString().padStart(2, '0')}${now.getMinutes().toString().padStart(2, '0')}`;
                 
-                // Use window.saveAs for robustness
                 window.saveAs(out, `Orcamento_Rev_${timestamp}.docx`);
 
             } catch (error: any) {
                 console.error("Erro ao gerar DOCX:", error);
-                 // Check for a specific error from docxtemplater about missing tags
                 if (error.properties && error.properties.id === 'template_error') {
                     alert(`Ocorreu um erro no modelo: ${error.message}\n\nVerifique se todos os placeholders (ex: {nome_cliente}) estão corretos no seu arquivo .docx.`);
                 } else {
@@ -270,9 +296,9 @@ Observações: ${observations || "-"}
                                         <p className="text-xs text-slate-500 mt-1">Use placeholders como `&#123;nome_cliente&#125;`. <span className="font-semibold">Dica:</span> Insira a logo da sua editora diretamente no arquivo de modelo.</p>
                                     </div>
                                     <div className="flex space-x-3 pt-2">
-                                        <button onClick={handleGenerateDocx} disabled={!templateFile} className="flex items-center justify-center w-36 px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all duration-200 disabled:bg-slate-400 disabled:cursor-not-allowed">
+                                        <button onClick={handleGenerateDocx} disabled={!templateFile || !libsReady} className="flex items-center justify-center w-36 px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all duration-200 disabled:bg-slate-400 disabled:cursor-not-allowed">
                                             <DownloadIcon className="w-5 h-5 mr-2" />
-                                            Gerar DOCX
+                                            {libsReady ? 'Gerar DOCX' : 'Carregando...'}
                                         </button>
                                         <button onClick={handlePrint} className="flex items-center justify-center w-36 px-4 py-2 text-sm font-medium text-indigo-700 bg-indigo-100 rounded-lg hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all duration-200">
                                             <PrinterIcon className="w-5 h-5 mr-2" />
